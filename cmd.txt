@@ -1,0 +1,44 @@
+sudo docker run -d -p 5000:5000 --name registry registry:2
+
+sudo docker build -t localhost:5000/nodeapp:latest .
+sudo docker push localhost:5000/nodeapp:latest
+
+docker run -p 3000:3000 localhost:5000/nodeapp:latest
+curl http://localhost:3000
+
+kubectl apply -f k8s/configmap.yaml
+kubectl apply -f k8s/secret.yaml
+kubectl apply -f k8s/deployment.yaml
+kubectl apply -f k8s/service.yaml
+
+kubectl get pods
+kubectl get svc nodeapp-service
+curl http://<EXTERNAL-IP>
+
+Modifier le message dans configmap.yaml 
+kubectl apply -f k8s/configmap.yaml
+
+# Forcer redémarrage
+kubectl rollout restart deployment/nodeapp
+curl http://<EXTERNAL-IP>   # le message doit avoir changé
+
+curl http://<EXTERNAL-IP>
+# Réponse attendue : user = "admin", password = "******"
+
+# Installer ArgoCD
+kubectl create namespace argocd
+kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+
+kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=argocd-server -n argocd --timeout=120s
+
+[System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String((kubectl get secret argocd-initial-admin-secret -n argocd -o jsonpath="{.data.password}")))
+
+kubectl port-forward svc/argocd-server -n argocd 8080:443
+
+# Ouvrir https://localhost:8080 (login: admin)
+
+# Pousser ton code sur GitHub d'abord, puis :
+kubectl apply -f k8s/argocd-app.yaml
+
+# Vérifier la synchro
+kubectl get application -n argocd
